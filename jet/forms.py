@@ -138,9 +138,9 @@ class ModelLookupForm(forms.Form):
                 # if self.cleaned_data['object_id']:
                 #     filter_data.append(Q(pk=self.cleaned_data['object_id']))
                 qs = qs.filter(reduce(operator.or_, filter_data)).distinct()
-            if getattr(self.model_cls, 'automplete_select_related_fields', None):
+            if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
                 qs = qs.select_related(*self.model_cls.automplete_select_related_fields())
-            if getattr(self.model_cls, 'automplete_prefetch_related_fields', None):
+            if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
                 qs = qs.select_related(*self.model_cls.automplete_prefetch_related_fields())
             else:
                 qs = qs.none()
