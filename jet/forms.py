@@ -139,12 +139,13 @@ class ModelLookupForm(forms.Form):
                     for field in search_fields
                 ]
                 qs = qs.filter(reduce(operator.or_, filter_data)).distinct()
+            else:
+                qs = qs.none()   
             if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
                 qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
             if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
                 qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
-            else:
-                qs = qs.none()
+
 
         limit = self.cleaned_data['page_size'] or 100
         page = self.cleaned_data['page'] or 1
