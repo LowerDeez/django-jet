@@ -134,9 +134,10 @@ class ModelLookupForm(forms.Form):
                 qs = qs.filter(**filters)
             if getattr(self.model_cls, 'autocomplete_search_fields', None):
                 search_fields = self.model_cls.autocomplete_search_fields()
-                filter_data = [Q((field + '__icontains', self.cleaned_data['q'])) for field in search_fields]
-                # if self.cleaned_data['object_id']:
-                #     filter_data.append(Q(pk=self.cleaned_data['object_id']))
+                filter_data = [
+                    Q(**{f"{field}__icontains": self.cleaned_data['q']})
+                    for field in search_fields
+                ]
                 qs = qs.filter(reduce(operator.or_, filter_data)).distinct()
             if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
                 qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
