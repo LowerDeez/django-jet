@@ -48,18 +48,17 @@ class ModelLookupForm(forms.Form):
     def lookup(self):
         qs = self.model_cls.objects.all()
 
+        if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
+            qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
+
+        if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
+            qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
+
+        if getattr(self.model_cls, 'autocomplete_base_filters', None):
+            filters = self.model_cls.autocomplete_base_filters()
+            qs = qs.filter(**filters)
+
         if self.cleaned_data['q']:
-
-            if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
-                qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
-
-            if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
-                qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
-
-            if getattr(self.model_cls, 'autocomplete_base_filters', None):
-                filters = self.model_cls.autocomplete_base_filters()
-                qs = qs.filter(**filters)
-
             if getattr(self.model_cls, 'autocomplete_search_fields', None):
                 search_fields = self.model_cls.autocomplete_search_fields()
                 filter_data = [
