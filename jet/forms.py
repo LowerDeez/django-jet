@@ -1,4 +1,3 @@
-import json
 from django import forms
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -6,91 +5,12 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 import operator
 
-from jet.models import Bookmark, PinnedApplication
 from jet.utils import get_model_instance_label, user_is_authenticated
 from functools import reduce
 
-try:
-    from django.apps import apps
-    get_model = apps.get_model
-except ImportError:
-    from django.db.models.loading import get_model
+from django.apps import apps
 
-
-class AddBookmarkForm(forms.ModelForm):
-    def __init__(self, request, *args, **kwargs):
-        self.request = request
-        super(AddBookmarkForm, self).__init__(*args, **kwargs)
-
-    class Meta:
-        model = Bookmark
-        fields = ['url', 'title']
-
-    def clean(self):
-        data = super(AddBookmarkForm, self).clean()
-        if not user_is_authenticated(self.request.user) or not self.request.user.is_staff:
-            raise ValidationError('error')
-        if not self.request.user.has_perm('jet.change_bookmark'):
-            raise ValidationError('error')
-        return data
-
-    def save(self, commit=True):
-        self.instance.user = self.request.user.pk
-        return super(AddBookmarkForm, self).save(commit)
-
-
-class RemoveBookmarkForm(forms.ModelForm):
-    def __init__(self, request, *args, **kwargs):
-        self.request = request
-        super(RemoveBookmarkForm, self).__init__(*args, **kwargs)
-
-    class Meta:
-        model = Bookmark
-        fields = []
-
-    def clean(self):
-        data = super(RemoveBookmarkForm, self).clean()
-        if not user_is_authenticated(self.request.user) or not self.request.user.is_staff:
-            raise ValidationError('error')
-        if self.instance.user != self.request.user.pk:
-            raise ValidationError('error')
-        return data
-
-    def save(self, commit=True):
-        if commit:
-            self.instance.delete()
-
-
-class ToggleApplicationPinForm(forms.ModelForm):
-    def __init__(self, request, *args, **kwargs):
-        self.request = request
-        super(ToggleApplicationPinForm, self).__init__(*args, **kwargs)
-
-    class Meta:
-        model = PinnedApplication
-        fields = ['app_label']
-
-    def clean(self):
-        data = super(ToggleApplicationPinForm, self).clean()
-        if not user_is_authenticated(self.request.user) or not self.request.user.is_staff:
-            raise ValidationError('error')
-        return data
-
-    def save(self, commit=True):
-        if commit:
-            try:
-                pinned_app = PinnedApplication.objects.get(
-                    app_label=self.cleaned_data['app_label'],
-                    user=self.request.user.pk
-                )
-                pinned_app.delete()
-                return False
-            except PinnedApplication.DoesNotExist:
-                PinnedApplication.objects.create(
-                    app_label=self.cleaned_data['app_label'],
-                    user=self.request.user.pk
-                )
-                return True
+get_model = apps.get_model
 
 
 class ModelLookupForm(forms.Form):
@@ -126,26 +46,30 @@ class ModelLookupForm(forms.Form):
         return data
 
     def lookup(self):
-        qs = self.model_cls.objects
+        qs = self.model_cls.objects.all()
 
         if self.cleaned_data['q']:
+
+            if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
+                qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
+
+            if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
+                qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
+
             if getattr(self.model_cls, 'autocomplete_base_filters', None):
                 filters = self.model_cls.autocomplete_base_filters()
                 qs = qs.filter(**filters)
+
             if getattr(self.model_cls, 'autocomplete_search_fields', None):
                 search_fields = self.model_cls.autocomplete_search_fields()
                 filter_data = [
                     Q(**{f"{field}__icontains": self.cleaned_data['q']})
                     for field in search_fields
                 ]
-                qs = qs.filter(reduce(operator.or_, filter_data)).distinct()
+                filter_query = reduce(operator.or_, filter_data)
+                qs = qs.filter(filter_query).distinct()
             else:
-                qs = qs.none()   
-            if getattr(self.model_cls, 'autocomplete_select_related_fields', None):
-                qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
-            if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
-                qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
-
+                qs = qs.none()
 
         limit = self.cleaned_data['page_size'] or 100
         page = self.cleaned_data['page'] or 1
@@ -156,8 +80,8 @@ class ModelLookupForm(forms.Form):
             qs.distinct()[offset:offset + limit]
         ))
         total = qs.count()
-        
-        # important to have a possibility to select an empty value         
+
+        # important to have a possibility to select an empty value
         items.insert(0, {'id': 0, 'text': '----------'})
 
         return items, total
