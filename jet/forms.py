@@ -132,7 +132,7 @@ class ModelLookupForm(forms.Form):
             qs = qs.select_related(*self.model_cls.autocomplete_select_related_fields())
 
         if getattr(self.model_cls, 'autocomplete_prefetch_related_fields', None):
-            qs = qs.select_related(*self.model_cls.autocomplete_prefetch_related_fields())
+            qs = qs.prefetch_related(*self.model_cls.autocomplete_prefetch_related_fields())
 
         if getattr(self.model_cls, 'autocomplete_base_filters', None):
             filters = self.model_cls.autocomplete_base_filters()
